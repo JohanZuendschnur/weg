@@ -173,9 +173,9 @@ function gearBox(x){var t=el("input",{type:"text",value:x.t,maxlength:"200","ari
   el("label",{class:"chk"},[cb," Aesterior: Vasenmenü in diesem Todo"]),el("div",{class:"meta"},["Dauerhaft: das Todo bleibt bestehen, auch wenn alle Stationen erledigt sind, und wird immer wieder neu gefüllt."])]);}
 function seg(cur,set){var d=el("div",{class:"seg",role:"group","aria-label":"Wichtigkeit"});
  PN.forEach(function(n,i){d.appendChild(el("button",{type:"button",class:"s p"+i+(cur===i?" on":""),"aria-pressed":cur===i?"true":"false",onclick:function(){set(i);[].forEach.call(d.children,function(b,j){b.classList.toggle("on",j===i);b.setAttribute("aria-pressed",j===i?"true":"false");});}},[n]));});return d;}
-var CA=["sandgrau","butterlemongelb","matcha-grün","helllila","orange","weiß","blaugrau","altrosa","schwarz"],CB=CA.concat(["dunkelgrün","betongrau","hellrosa","pink"]);
+var CA=["sandgrau","butterlemongelb","matcha-grün","helllila","orange","weiß","blaugrau","altrosa","schwarz"],CB=CA.concat(["dunkelgrün","betongrau","hellrosa","pink","dunkelrot"]);
 var VM=[{n:"JUNA",h:20,c:CB},{n:"CAVA",h:15,c:CB},{n:"ENA",h:13,c:CB},{n:"LURA",h:13,c:CB},{n:"Weihnachtsanhänger",c:CB},{n:"Osteranhänger",c:CB}];
-var SW={"sandgrau":"#b9ae9c","butterlemongelb":"#f2e08a","matcha-grün":"#a8c18b","helllila":"#c9b8e3","orange":"#ee8a3a","weiß":"#f3f2ee","blaugrau":"#7f93a6","altrosa":"#d4a1a6","schwarz":"#222428","dunkelgrün":"#2f5a45","betongrau":"#8c8e90","hellrosa":"#f5d0d8","pink":"#e8579a"};
+var SW={"sandgrau":"#b9ae9c","butterlemongelb":"#f2e08a","matcha-grün":"#a8c18b","helllila":"#c9b8e3","orange":"#ee8a3a","weiß":"#f3f2ee","blaugrau":"#7f93a6","altrosa":"#d4a1a6","schwarz":"#222428","dunkelgrün":"#2f5a45","betongrau":"#8c8e90","hellrosa":"#f5d0d8","pink":"#e8579a","dunkelrot":"#7a1f26"};
 var jobOpen=true,jm=0,jc=null,jq=1;
 function swatch(c){return el("span",{class:"sw",style:"background:"+(SW[c]||"#888")});}
 function prText(x){return (x.q>1?x.q+" ":"")+x.m+" "+x.c;}
