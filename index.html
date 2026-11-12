@@ -183,7 +183,7 @@ function nPr(id){return (S.prints||[]).filter(function(p){return p.tid===id&&!p.
 function titleOf(id){var t=S.items.filter(function(i){return i.id===id;})[0];return t?t.t:"";}
 var JO={g:true,t:true};
 function addPrint(tid){var v=VM[jm];if(!jc||v.c.indexOf(jc)<0){msg="Bitte erst eine Farbe wählen.";if(FINE)af="job-qty";return render();}
- S.prints=S.prints||[];var e={id:uid(),m:v.n,c:jc,q:Math.max(1,Math.min(999,jq|0)),upd:Date.now()};if(tid)e.tid=tid;S.prints.push(e);jq=1;msg="";if(FINE)af="job-qty";commit();}
+ S.prints=S.prints||[];var n=Math.max(1,Math.min(99,jq|0));for(var i=0;i<n;i++){var e={id:uid(),m:v.n,c:jc,q:1,upd:Date.now()};if(tid)e.tid=tid;S.prints.push(e);}jq=1;msg="";if(FINE)af="job-qty";commit();}
 function rmPrint(x){tomb(x.id);S.prints.splice(S.prints.indexOf(x),1);commit();}
 function clearDone(){S.log=S.log||[];(S.prints||[]).filter(function(p){return p.done;}).forEach(function(p){S.log.push({id:p.id+"-job",at:p.doneAt||Date.now(),vases:p.q});tomb(p.id);});S.prints=(S.prints||[]).filter(function(p){return !p.done;});commit();}
 function printList(){var P=S.prints||[];if(!P.length)return null;var ul=el("ul",{class:"pl2"}),nd=0;
@@ -197,12 +197,12 @@ function jobPanel(tid){var k=tid?"t":"g";
  var v=VM[jm],box=el("div",{class:"panel job"},[el("h2",{},["Vasen drucken"])]);
  var mo=el("div",{class:"opts"});VM.forEach(function(x,i){mo.appendChild(el("button",{type:"button",class:"opt"+(i===jm?" on":""),onclick:function(){jm=i;if(VM[i].c.indexOf(jc)<0)jc=null;if(FINE)af="job-qty";render();}},[x.n+(x.h?" "+x.h+" cm":"")]));});
  var co=el("div",{class:"opts"});v.c.forEach(function(c){co.appendChild(el("button",{type:"button",class:"opt"+(c===jc?" on":""),onclick:function(){jc=c;if(FINE)af="job-qty";render();}},[swatch(c),c]));});
- var q=el("input",{type:"number",min:"1",max:"999",value:String(jq),"aria-label":"Stückzahl","data-k":"job-qty"});
+ var q=el("input",{type:"number",min:"1",max:"99",value:String(jq),"aria-label":"Stückzahl","data-k":"job-qty"});
  q.addEventListener("input",function(){jq=Math.max(1,parseInt(q.value,10)||1);});
  q.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addPrint(tid);}});
  box.appendChild(mo);box.appendChild(co);
  box.appendChild(el("div",{class:"row"},[el("label",{},["Stückzahl ",q]),el("button",{class:"primary",type:"button",onclick:function(){addPrint(tid);}},["Hinzufügen"]),el("button",{type:"button",onclick:function(){JO[k]=false;render();}},["Schließen"])]));
- box.appendChild(el("div",{class:"meta",style:"margin-top:8px"},["Die Einträge stehen in der Druckliste ganz unten in der Übersicht."+(tid?" Offen aus diesem Todo: "+nPr(tid):"")]));
+ box.appendChild(el("div",{class:"meta",style:"margin-top:8px"},["Jedes Stück kommt als eigene Zeile in die Druckliste ganz unten in der Übersicht."+(tid?" Offen aus diesem Todo: "+nPr(tid):"")]));
  return box;}
 function pn(x){return x.prio==null?1:x.prio;}
 function grp(x){return pn(x)===0?0:x.perm?1:pn(x)===1?2:3;}
@@ -215,6 +215,7 @@ function leaves(list,f){list.forEach(function(x){if(x.kids.length)leaves(x.kids,
 function arch(x){leaves([x],function(l){if(l.done)S.log.push({id:l.id,at:l.doneAt||Date.now()});});}
 function sweep(){S.log=S.log||[];S.prints=S.prints||[];
  S.items.slice().forEach(function(x){if(x.job&&!isDone(x)){S.prints.push({id:uid(),m:x.job.m,c:x.job.c,q:x.job.q,upd:Date.now()});tomb(x.id);S.items.splice(S.items.indexOf(x),1);}});
+ S.prints=S.prints.reduce(function(o,p){if((p.q||1)>1){tomb(p.id);for(var i=0;i<Math.min(p.q,200);i++){var e={id:uid(),m:p.m,c:p.c,q:1,upd:Date.now()};if(p.tid)e.tid=p.tid;if(p.done){e.done=true;e.doneAt=p.doneAt;}o.push(e);}}else o.push(p);return o;},[]);
  S.items.slice().forEach(function(x){if(!x.kids.length||!isDone(x))return;
   arch(x);
   if(x.perm){x.kids.forEach(function(k){tomb(k.id);});x.kids=[];x.done=false;x.upd=Date.now();msg="Dauer-Todo „"+x.t+"“ ist geleert und wartet auf neue Aufgaben.";}
