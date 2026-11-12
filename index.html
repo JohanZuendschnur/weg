@@ -72,6 +72,14 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 @media (min-width:1200px){.today{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:14px;width:270px;max-height:45vh;overflow:auto;z-index:5}}
 .back{font-size:1.6rem;font-weight:700;padding:22px 42px;background:var(--gold);color:var(--goldink);border-color:var(--gold);border-radius:10px}
 .seg.mk .s:hover{color:var(--onp)}.seg.mk .s.p0:hover{background:var(--p0)}.seg.mk .s.p1:hover{background:var(--p1)}.seg.mk .s.p2:hover{background:var(--p2)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid var(--line)}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.opt{border-radius:999px;padding:4px 12px}
+.opt.on{background:var(--gold);color:var(--goldink);border-color:var(--gold)}
+.job .row{gap:10px;margin-top:6px}
+.job label{display:inline-flex;gap:6px;align-items:center}
+.job input[type=number]{width:5em;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.pl2{list-style:none;margin:0;padding:0}.pl2 li{padding:2px 0}
 .gear{padding:2px 9px;font-size:1.05rem}
 .gearbox{flex-basis:100%;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:10px;display:grid;gap:8px}
 .tg.on{background:var(--gold);color:var(--goldink);border-color:var(--gold)}
@@ -89,13 +97,20 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .st.drag{position:relative;z-index:3;opacity:.85}.st.dt{box-shadow:-3px 0 0 var(--gold)}
 .stats{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0 14px}
 .stats .row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.pw{position:relative;padding-top:34px}
+.pw{position:relative;padding-top:34px;padding-bottom:18px}
 .pbar{height:16px;border:2px solid var(--gold);border-radius:10px;overflow:hidden}
 .pfill{height:100%;background:repeating-linear-gradient(90deg,var(--gold) 0 14px,transparent 14px 16px);transition:width .8s}
 .ph{position:absolute;top:0;width:22px;height:34px;margin-left:-11px;color:var(--ink);transition:left .8s}.ph svg{width:100%;height:100%;display:block}
 .week{display:flex;gap:6px;align-items:flex-end}
 .dc{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:68px;width:28px;font-size:.7rem;color:var(--mute)}
 .db{width:16px;background:var(--gold);border-radius:3px 3px 0 0}
+.pico{display:inline-block;margin-right:6px;color:var(--gold);font-weight:700}
+.roots li.clk{cursor:pointer}.roots li.clk:hover{box-shadow:0 0 0 1px var(--gold)}
+.msr{position:absolute;left:0;right:0;bottom:0;height:14px}
+.mst{position:absolute;bottom:0;transform:translateX(-50%);color:var(--line);transition:color .6s,transform .6s}
+.mst.on{color:var(--gold);transform:translateX(-50%) scale(1.3)}
+.mst svg{width:12px;height:12px;display:block}
+@media (prefers-reduced-motion:no-preference){.ph svg{animation:bob 1.1s ease-in-out infinite}@keyframes bob{50%{transform:translateY(-2px)}}}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
@@ -145,7 +160,36 @@ function gearBox(x){var t=el("input",{type:"text",value:x.t,maxlength:"200","ari
   el("div",{class:"meta"},["Dauerhaft: das Todo bleibt bestehen, auch wenn alle Stationen erledigt sind, und wird immer wieder neu gefüllt."])]);}
 function seg(cur,set){var d=el("div",{class:"seg",role:"group","aria-label":"Wichtigkeit"});
  PN.forEach(function(n,i){d.appendChild(el("button",{type:"button",class:"s p"+i+(cur===i?" on":""),"aria-pressed":cur===i?"true":"false",onclick:function(){set(i);[].forEach.call(d.children,function(b,j){b.classList.toggle("on",j===i);b.setAttribute("aria-pressed",j===i?"true":"false");});}},[n]));});return d;}
+var CA=["sandgrau","butterlemongelb","matcha-grün","helllila","orange","weiß","blaugrau","altrosa","schwarz"],CB=CA.concat(["dunkelgrün","betongrau","hellrosa","pink"]);
+var VM=[{n:"JUNA",h:20,c:CB},{n:"CAVA",h:15,c:CB},{n:"ENA",h:13,c:CB},{n:"LURA",h:13,c:CB}];
+var SW={"sandgrau":"#b9ae9c","butterlemongelb":"#f2e08a","matcha-grün":"#a8c18b","helllila":"#c9b8e3","orange":"#ee8a3a","weiß":"#f3f2ee","blaugrau":"#7f93a6","altrosa":"#d4a1a6","schwarz":"#222428","dunkelgrün":"#2f5a45","betongrau":"#8c8e90","hellrosa":"#f5d0d8","pink":"#e8579a"};
+var jobOpen=false,jm=0,jc=null,jq=1;
+function swatch(c){return el("span",{class:"sw",style:"background:"+(SW[c]||"#888")});}
+function createJob(pr){var v=VM[jm];if(!jc||v.c.indexOf(jc)<0){msg="Bitte erst eine Farbe wählen.";return render();}
+ var q=Math.max(1,Math.min(999,jq|0)),t=q+"× "+v.n+" "+v.h+" cm, "+jc,m=mk(t,false);
+ m.prio=pr;m.job={m:v.n,h:v.h,c:jc,q:q};
+ m.kids=["Filament "+jc+" bereitstellen","Drucken ("+q+"×)","Nachbearbeiten (Stützen, Grat)","Glaseinsatz prüfen und einsetzen","Qualitätskontrolle","Verpacken und bereitlegen"].map(function(x){return mk(x,false);});
+ S.items.push(m);msg="Druckauftrag angelegt: "+t;jq=1;commit();}
+function printList(){var g={};S.items.forEach(function(x){if(!x.job||isDone(x))return;(g[x.job.c]=g[x.job.c]||[]).push(x.job);});
+ var ks=Object.keys(g);if(!ks.length)return null;var ul=el("ul",{class:"pl2"});
+ ks.forEach(function(k){var n=0,parts=g[k].map(function(j){n+=j.q;return j.q+"× "+j.m+" "+j.h+" cm";});
+  ul.appendChild(el("li",{},[swatch(k),el("strong",{},[k+": "+n+" Stück"]),el("span",{class:"meta"},[" ("+parts.join(", ")+")"])]));});
+ return el("div",{style:"margin-top:10px"},[el("h2",{},["Druckliste nach Farbe"]),ul]);}
+function jobPanel(){
+ if(!jobOpen)return el("button",{class:"primary",style:"margin:0 0 12px",onclick:function(){jobOpen=true;render();}},["＋ Druckauftrag für Vasen"]);
+ var v=VM[jm],box=el("div",{class:"panel job"},[el("h2",{},["Druckauftrag"])]);
+ var mo=el("div",{class:"opts"});VM.forEach(function(x,i){mo.appendChild(el("button",{type:"button",class:"opt"+(i===jm?" on":""),onclick:function(){jm=i;if(VM[i].c.indexOf(jc)<0)jc=null;render();}},[x.n+" "+x.h+" cm"]));});
+ var co=el("div",{class:"opts"});v.c.forEach(function(c){co.appendChild(el("button",{type:"button",class:"opt"+(c===jc?" on":""),onclick:function(){jc=c;render();}},[swatch(c),c]));});
+ var q=el("input",{type:"number",min:"1",max:"999",value:String(jq),"aria-label":"Stückzahl","data-k":"job-qty"});
+ q.addEventListener("input",function(){jq=Math.max(1,parseInt(q.value,10)||1);});
+ box.appendChild(mo);box.appendChild(co);
+ box.appendChild(el("div",{class:"row"},[el("label",{},["Stückzahl ",q]),el("span",{class:"meta"},["Anlegen mit Wichtigkeit:"]),mkBtns(createJob),el("button",{onclick:function(){jobOpen=false;render();}},["Schließen"])]));
+ var pl=printList();if(pl)box.appendChild(pl);
+ return box;}
 function pn(x){return x.prio==null?1:x.prio;}
+function grp(x){return pn(x)===0?0:x.perm?1:pn(x)===1?2:3;}
+function permIco(x){return x.perm?[el("span",{class:"pico",title:"Dauerhaftes Todo"},["↻"])]:[];}
+var STAR='<svg viewBox="0 0 44 44"><polygon points="22,3 28,16 42,17 31,27 34,41 22,34 10,41 13,27 2,17 16,16" fill="currentColor"/></svg>';
 function keep(){var a=document.activeElement;return a&&a.dataset&&a.dataset.k?{k:a.dataset.k,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;}
 function restore(f){if(!f)return;var n=document.querySelector('[data-k="'+f.k+'"]');if(!n)return;if(f.v!=null)n.value=f.v;n.focus();if(f.s!=null)try{n.setSelectionRange(f.s,f.e);}catch(e){}}
 function leaves(list,f){list.forEach(function(x){if(x.kids.length)leaves(x.kids,f);else f(x);});}
@@ -154,19 +198,19 @@ function sweep(){S.log=S.log||[];
  S.items.slice().forEach(function(x){if(!x.kids.length||!isDone(x))return;
   arch(x);
   if(x.perm){x.kids.forEach(function(k){tomb(k.id);});x.kids=[];x.done=false;x.upd=Date.now();msg="Dauer-Todo „"+x.t+"“ ist geleert und wartet auf neue Aufgaben.";}
-  else{tomb(x.id);S.items.splice(S.items.indexOf(x),1);msg="„"+x.t+"“ ist komplett erledigt und im Archiv.";}});}
+  else{if(x.job)S.log.push({id:x.id+"-job",at:Date.now(),vases:x.job.q});tomb(x.id);S.items.splice(S.items.indexOf(x),1);msg="„"+x.t+"“ ist komplett erledigt und im Archiv.";}});}
 function kwNr(d){var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);return Math.ceil(((t-Date.UTC(t.getUTCFullYear(),0,1))/864e5+1)/7);}
 function stats(){var tot=0,dn=0,d=new Date(),k=(d.getDay()+6)%7,w0=new Date(d.getFullYear(),d.getMonth(),d.getDate()-k).getTime(),days=[0,0,0,0,0,0,0],wk=0;
  function cnt(at){if(at>=w0&&at<w0+6048e5){wk++;days[Math.min(6,Math.floor((at-w0)/864e5))]++;}}
  leaves(S.items,function(x){if(x.perm)return;tot++;if(x.done){dn++;if(x.doneAt)cnt(x.doneAt);}});
- (S.log||[]).forEach(function(l){cnt(l.at);});
- return {tot:tot,dn:dn,wk:wk,days:days,kw:kwNr(d)};}
+ var vs=0;(S.log||[]).forEach(function(l){if(l.vases){if(l.at>=w0&&l.at<w0+6048e5)vs+=l.vases;}else cnt(l.at);});
+ return {tot:tot,dn:dn,wk:wk,vs:vs,days:days,kw:kwNr(d)};}
 function statsBox(){var s=stats(),pct=s.tot?Math.round(100*s.dn/s.tot):0,mx=Math.max(1,Math.max.apply(null,s.days)),hero=el("div",{class:"ph",style:"left:"+pct+"%"});hero.innerHTML=FIG;
  var cols=s.days.map(function(n,i){return el("div",{class:"dc"},[el("div",{class:"db",style:"height:"+(4+Math.round(50*n/mx))+"px"}),el("span",{},[["Mo","Di","Mi","Do","Fr","Sa","So"][i]])]);});
  return el("div",{class:"stats"},[
   el("div",{class:"row"},[el("strong",{},["Gesamtfortschritt "+pct+" %"]),el("span",{class:"meta"},[s.dn+" von "+s.tot+" Stationen erledigt"])]),
-  el("div",{class:"pw"},[el("div",{class:"pbar"},[el("div",{class:"pfill",style:"width:"+pct+"%"})]),hero]),
-  el("div",{class:"row",style:"margin-top:10px;align-items:flex-end"},[el("div",{},[el("strong",{},["KW "+s.kw]),el("div",{class:"meta"},[s.wk+" geschafft"])]),el("div",{class:"week"},cols)])]);}
+  el("div",{class:"pw"},[el("div",{class:"pbar"},[el("div",{class:"pfill",style:"width:"+pct+"%"})]),hero,el("div",{class:"msr"},[25,50,75,100].map(function(m){var d=el("span",{class:"mst"+(pct>=m?" on":""),style:"left:"+m+"%"});d.innerHTML=STAR;return d;}))]),
+  el("div",{class:"row",style:"margin-top:10px;align-items:flex-end"},[el("div",{},[el("strong",{},["KW "+s.kw]),el("div",{class:"meta"},[s.wk+" geschafft"]),s.vs?el("div",{class:"meta"},[s.vs+" Vasen gedruckt"]):null]),el("div",{class:"week"},cols)])]);}
 function drag(h,list,lane){h.addEventListener("pointerdown",function(e){
  e.preventDefault();var el0=h.closest(".st"),sts=[].slice.call(lane.querySelectorAll(".st")),from=sts.indexOf(el0),oth=sts.filter(function(s){return s!==el0;}),sx=e.clientX,moved=false,to=from;
  try{h.setPointerCapture(e.pointerId);}catch(x){}
@@ -184,15 +228,16 @@ function root(app){
  var mkc=function(pr){var v=inp.value;inp.value="";af="new-root";addTo(S.items,v,false,null,pr);};
  inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();mkc(1);}});
  app.appendChild(el("form",{class:"add",onsubmit:function(e){e.preventDefault();}},[inp,mkBtns(mkc)]));
+ app.appendChild(jobPanel());
  var ul=el("ul",{class:"roots"});
- S.items.slice().sort(function(a,b){return pn(a)-pn(b);}).forEach(function(x){var c=count(x),dn=isDone(x),pr=pn(x);
-  ul.appendChild(el("li",{class:(dn&&!x.perm?"dn ":"")+"L"+pr},[
-   el("div",{class:"t"},[(x.problem&&!dn?"! ":"")+x.t]),
+ S.items.slice().sort(function(a,b){return grp(a)-grp(b)||pn(a)-pn(b);}).forEach(function(x){var c=count(x),dn=isDone(x),pr=pn(x);
+  ul.appendChild(el("li",{class:(dn&&!x.perm?"dn ":"")+"clk L"+pr,tabindex:"0",onclick:function(e){if(e.target.closest("button,input,a,select,label,.gearbox"))return;go([x.id]);},onkeydown:function(e){if(e.key==="Enter"&&e.target===e.currentTarget)go([x.id]);}},[
+   el("div",{class:"t"},[x.job?swatch(x.job.c):null].concat(permIco(x),[(x.problem&&!dn?"! ":"")+x.t])),
    seg(pr,function(i){x.prio=i;x.upd=Date.now();commit();}),
    el("button",{class:"gear","aria-label":"Einstellungen",title:"Name ändern, Dauerhaft",onclick:function(){gearId=gearId===x.id?null:x.id;render();}},["⚙"]),
    el("span",{class:"meta"},[c[1]?c[0]+" von "+c[1]+" Stationen":""]),
    hasProb(x)?el("span",{class:"bad"},["Problem enthalten"]):null,
-   el("button",{class:"primary",onclick:function(){go([x.id]);}},["Weg öffnen"]),
+   
    !x.kids.length&&!x.perm?el("button",{onclick:function(){x.done=!x.done;x.doneAt=x.done?Date.now():0;x.upd=Date.now();commit();}},[x.done?"Wieder öffnen":"Erledigt"]):null,
    el("button",{onclick:function(){if(delArm===x.id){tomb(x.id);S.items.splice(S.items.indexOf(x),1);delArm=null;commit();}else{delArm=x.id;render();}}},[delArm===x.id?"Wirklich löschen?":"Löschen"]),gearId===x.id?gearBox(x):null]));});
  app.appendChild(S.items.length?ul:el("p",{class:"sub"},["Noch nichts da. Lege dein erstes Todo an, danach öffnest du seinen Weg und fügst Stationen hinzu."]));
@@ -333,7 +378,7 @@ setInterval(cal,600000);
 function snapLines(){var L=[],P=[];
  function walk(x,tr){tr=tr.concat(x.t);var c=x.kids.filter(function(k){return !isDone(k);})[0];if(c)walk(c,tr);else L.push(tr.join(" › "));}
  (function pr(list,tr){list.forEach(function(x){if(x.problem&&!isDone(x))P.push(tr.concat(x.t).join(" › "));pr(x.kids,tr.concat(x.t));});})(S.items,[]);
- S.items.slice().sort(function(a,b){return pn(a)-pn(b);}).forEach(function(x){if(isDone(x)||(x.perm&&!x.kids.length))return;var n=L.length;walk(x,[]);if(x.prio===0)L[n]="DRINGEND: "+L[n];});
+ S.items.slice().sort(function(a,b){return grp(a)-grp(b)||pn(a)-pn(b);}).forEach(function(x){if(isDone(x)||(x.perm&&!x.kids.length))return;var n=L.length;walk(x,[]);if(x.prio===0)L[n]="DRINGEND: "+L[n];});
  return {at:new Date().toISOString(),todos:L,problems:P};}
 function snap(){var body=JSON.stringify(snapLines()),N="weg-snapshot.json";
  gf(API+"drive/v3/files?fields=files(id)&q="+encodeURIComponent("name='"+N+"' and trashed=false")).then(function(r){return r.json();}).then(function(j){
