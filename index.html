@@ -261,6 +261,8 @@ function root(app){
    
    !x.kids.length&&!x.perm?el("button",{onclick:function(){x.done=!x.done;x.doneAt=x.done?Date.now():0;x.upd=Date.now();commit();}},[x.done?"Wieder öffnen":"Erledigt"]):null,
    el("button",{onclick:function(){if(delArm===x.id){tomb(x.id);S.items.splice(S.items.indexOf(x),1);delArm=null;commit();}else{delArm=x.id;render();}}},[delArm===x.id?"Wirklich löschen?":"Löschen"]),gearId===x.id?gearBox(x):null]));});
+ var dn0=S.items.filter(function(x){return !x.kids.length&&x.done&&!x.perm;});
+ if(dn0.length)app.appendChild(el("div",{class:"row",style:"justify-content:flex-end;margin:0 0 8px"},[el("button",{onclick:function(){S.log=S.log||[];dn0.forEach(function(x){arch(x);tomb(x.id);S.items.splice(S.items.indexOf(x),1);});msg=dn0.length+" erledigte Todos entfernt.";commit();}},["Erledigte entfernen ("+dn0.length+")"])]));
  app.appendChild(S.items.length?ul:el("p",{class:"sub"},["Noch nichts da. Lege dein erstes Todo an, danach öffnest du seinen Weg und fügst Stationen hinzu."]));
  var ps=probs(S.items,[],[]);
  if(ps.length){var pnl=el("div",{class:"panel"},[el("h2",{class:"bad"},["Offene Probleme ("+ps.length+")"])]);
