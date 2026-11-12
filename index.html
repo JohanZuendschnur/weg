@@ -40,7 +40,9 @@ form.add input[type=text]{flex:1;min-width:160px}
 ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .roots li{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .roots li.dn .t{text-decoration:line-through;color:var(--mute)}
-.roots .t{flex:1;min-width:140px;overflow-wrap:anywhere}
+.roots .t{flex:1;min-width:140px;overflow-wrap:anywhere;font-size:1.3rem;font-weight:600;line-height:1.25}
+@media (min-width:900px){.roots .t{font-size:1.5rem}}
+@media (max-width:720px){.roots .t{flex-basis:100%}}
 .meta{color:var(--mute);font-size:.85rem}
 .bad{color:var(--warn);font-weight:600}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:16px}
