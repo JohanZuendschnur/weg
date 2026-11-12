@@ -174,7 +174,7 @@ function gearBox(x){var t=el("input",{type:"text",value:x.t,maxlength:"200","ari
 function seg(cur,set){var d=el("div",{class:"seg",role:"group","aria-label":"Wichtigkeit"});
  PN.forEach(function(n,i){d.appendChild(el("button",{type:"button",class:"s p"+i+(cur===i?" on":""),"aria-pressed":cur===i?"true":"false",onclick:function(){set(i);[].forEach.call(d.children,function(b,j){b.classList.toggle("on",j===i);b.setAttribute("aria-pressed",j===i?"true":"false");});}},[n]));});return d;}
 var CA=["sandgrau","butterlemongelb","matcha-grün","helllila","orange","weiß","blaugrau","altrosa","schwarz"],CB=CA.concat(["dunkelgrün","betongrau","hellrosa","pink"]);
-var VM=[{n:"JUNA",h:20,c:CB},{n:"CAVA",h:15,c:CB},{n:"ENA",h:13,c:CB},{n:"LURA",h:13,c:CB}];
+var VM=[{n:"JUNA",h:20,c:CB},{n:"CAVA",h:15,c:CB},{n:"ENA",h:13,c:CB},{n:"LURA",h:13,c:CB},{n:"Weihnachtsanhänger",c:CB},{n:"Osteranhänger",c:CB}];
 var SW={"sandgrau":"#b9ae9c","butterlemongelb":"#f2e08a","matcha-grün":"#a8c18b","helllila":"#c9b8e3","orange":"#ee8a3a","weiß":"#f3f2ee","blaugrau":"#7f93a6","altrosa":"#d4a1a6","schwarz":"#222428","dunkelgrün":"#2f5a45","betongrau":"#8c8e90","hellrosa":"#f5d0d8","pink":"#e8579a"};
 var jobOpen=true,jm=0,jc=null,jq=1;
 function swatch(c){return el("span",{class:"sw",style:"background:"+(SW[c]||"#888")});}
@@ -195,7 +195,7 @@ function printList(){var P=S.prints||[];if(!P.length)return null;var ul=el("ul",
 function jobPanel(tid){var k=tid?"t":"g";
  if(!JO[k])return el("button",{class:"primary",style:"margin:0 0 12px",onclick:function(){JO[k]=true;if(FINE)af="job-qty";render();}},["＋ Vasen drucken"]);
  var v=VM[jm],box=el("div",{class:"panel job"},[el("h2",{},["Vasen drucken"])]);
- var mo=el("div",{class:"opts"});VM.forEach(function(x,i){mo.appendChild(el("button",{type:"button",class:"opt"+(i===jm?" on":""),onclick:function(){jm=i;if(VM[i].c.indexOf(jc)<0)jc=null;if(FINE)af="job-qty";render();}},[x.n+" "+x.h+" cm"]));});
+ var mo=el("div",{class:"opts"});VM.forEach(function(x,i){mo.appendChild(el("button",{type:"button",class:"opt"+(i===jm?" on":""),onclick:function(){jm=i;if(VM[i].c.indexOf(jc)<0)jc=null;if(FINE)af="job-qty";render();}},[x.n+(x.h?" "+x.h+" cm":"")]));});
  var co=el("div",{class:"opts"});v.c.forEach(function(c){co.appendChild(el("button",{type:"button",class:"opt"+(c===jc?" on":""),onclick:function(){jc=c;if(FINE)af="job-qty";render();}},[swatch(c),c]));});
  var q=el("input",{type:"number",min:"1",max:"999",value:String(jq),"aria-label":"Stückzahl","data-k":"job-qty"});
  q.addEventListener("input",function(){jq=Math.max(1,parseInt(q.value,10)||1);});
@@ -230,7 +230,7 @@ function statsBox(){var s=stats(),pct=s.tot?Math.round(100*s.dn/s.tot):0,mx=Math
  return el("div",{class:"stats"},[
   el("div",{class:"row"},[el("strong",{},["Gesamtfortschritt "+pct+" %"]),el("span",{class:"meta"},[s.dn+" von "+s.tot+" Stationen erledigt"])]),
   el("div",{class:"pw"},[el("div",{class:"pbar"},[el("div",{class:"pfill",style:"width:"+pct+"%"})]),hero,el("div",{class:"msr"},[25,50,75,100].map(function(m){var d=el("span",{class:"mst"+(pct>=m?" on":""),style:"left:"+m+"%"});d.innerHTML=STAR;return d;}))]),
-  el("div",{class:"row",style:"margin-top:10px;align-items:flex-end"},[el("div",{},[el("strong",{},["KW "+s.kw]),el("div",{class:"meta"},[s.wk+" geschafft"]),s.vs?el("div",{class:"meta"},[s.vs+" Vasen gedruckt"]):null]),el("div",{class:"week"},cols)])]);}
+  el("div",{class:"row",style:"margin-top:10px;align-items:flex-end"},[el("div",{},[el("strong",{},["KW "+s.kw]),el("div",{class:"meta"},[s.wk+" geschafft"]),s.vs?el("div",{class:"meta"},[s.vs+" Stück gedruckt"]):null]),el("div",{class:"week"},cols)])]);}
 function drag(h,list,lane){h.addEventListener("pointerdown",function(e){
  e.preventDefault();var el0=h.closest(".st"),sts=[].slice.call(lane.querySelectorAll(".st")),from=sts.indexOf(el0),oth=sts.filter(function(s){return s!==el0;}),sx=e.clientX,moved=false,to=from;
  try{h.setPointerCapture(e.pointerId);}catch(x){}
