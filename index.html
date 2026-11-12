@@ -120,6 +120,8 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .pl2 button{padding:3px 10px;font-size:.88rem}
 .pico svg{width:16px;height:16px;vertical-align:-3px}
 .chk{display:flex;gap:8px;align-items:center;font-size:.9rem}
+.pl2 li.dn strong,.pl2 li.dn .sw{opacity:.55}.pl2 li.dn strong{text-decoration:line-through}
+.pl2 input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold);flex:none}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
@@ -164,7 +166,7 @@ function gearBox(x){var t=el("input",{type:"text",value:x.t,maxlength:"200","ari
  t.addEventListener("change",sv);
  t.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();sv();gearId=null;render();}});
  var cb=el("input",{type:"checkbox"});cb.checked=!!x.aest;
- cb.addEventListener("change",function(){sv();if(!cb.checked&&nPr(x.id)){msg="Erst die Druckliste dieses Todos leeren.";cb.checked=true;return render();}x.aest=cb.checked;x.upd=Date.now();commit();});
+ cb.addEventListener("change",function(){sv();x.aest=cb.checked;x.upd=Date.now();commit();});
  return el("div",{class:"gearbox"},[el("label",{class:"meta"},["Name",t]),
   el("div",{class:"row"},[el("button",{class:"tg"+(x.perm?" on":""),type:"button","aria-pressed":x.perm?"true":"false",onclick:function(){sv();x.perm=!x.perm;x.upd=Date.now();commit();}},["Dauerhaft: "+(x.perm?"an":"aus")]),
    el("button",{class:"primary",type:"button",onclick:function(){sv();gearId=null;render();}},["Fertig"])]),
@@ -177,11 +179,19 @@ var SW={"sandgrau":"#b9ae9c","butterlemongelb":"#f2e08a","matcha-grün":"#a8c18b
 var jobOpen=true,jm=0,jc=null,jq=1;
 function swatch(c){return el("span",{class:"sw",style:"background:"+(SW[c]||"#888")});}
 function prText(x){return (x.q>1?x.q+" ":"")+x.m+" "+x.c;}
-function nPr(id){return (S.prints||[]).filter(function(p){return p.tid===id;}).length;}
+function nPr(id){return (S.prints||[]).filter(function(p){return p.tid===id&&!p.done;}).length;}
+function titleOf(id){var t=S.items.filter(function(i){return i.id===id;})[0];return t?t.t:"";}
 var JO={g:true,t:true};
 function addPrint(tid){var v=VM[jm];if(!jc||v.c.indexOf(jc)<0){msg="Bitte erst eine Farbe wählen.";if(FINE)af="job-qty";return render();}
  S.prints=S.prints||[];var e={id:uid(),m:v.n,c:jc,q:Math.max(1,Math.min(999,jq|0)),upd:Date.now()};if(tid)e.tid=tid;S.prints.push(e);jq=1;msg="";if(FINE)af="job-qty";commit();}
-function rmPrint(x,done){if(done){S.log=S.log||[];S.log.push({id:x.id+"-job",at:Date.now(),vases:x.q});}tomb(x.id);S.prints.splice(S.prints.indexOf(x),1);commit();}
+function rmPrint(x){tomb(x.id);S.prints.splice(S.prints.indexOf(x),1);commit();}
+function clearDone(){S.log=S.log||[];(S.prints||[]).filter(function(p){return p.done;}).forEach(function(p){S.log.push({id:p.id+"-job",at:p.doneAt||Date.now(),vases:p.q});tomb(p.id);});S.prints=(S.prints||[]).filter(function(p){return !p.done;});commit();}
+function printList(){var P=S.prints||[];if(!P.length)return null;var ul=el("ul",{class:"pl2"}),nd=0;
+ P.forEach(function(x){var cb=el("input",{type:"checkbox","aria-label":"Gedruckt"});cb.checked=!!x.done;if(x.done)nd++;
+  cb.addEventListener("change",function(){x.done=cb.checked;x.doneAt=cb.checked?Date.now():0;x.upd=Date.now();commit();});
+  var tn=x.tid?titleOf(x.tid):"";
+  ul.appendChild(el("li",{class:x.done?"dn":""},[cb,swatch(x.c),el("strong",{},[prText(x)]),tn?el("span",{class:"meta"},[tn]):null,el("button",{type:"button","aria-label":"Löschen",onclick:function(){rmPrint(x);}},["✕"])]));});
+ return el("div",{class:"panel"},[el("div",{class:"head"},[el("h2",{},["Druckliste"]),nd?el("button",{type:"button",onclick:clearDone},["Erledigte entfernen ("+nd+")"]):null]),ul]);}
 function jobPanel(tid){var k=tid?"t":"g";
  if(!JO[k])return el("button",{class:"primary",style:"margin:0 0 12px",onclick:function(){JO[k]=true;if(FINE)af="job-qty";render();}},["＋ Vasen drucken"]);
  var v=VM[jm],box=el("div",{class:"panel job"},[el("h2",{},["Vasen drucken"])]);
@@ -192,10 +202,7 @@ function jobPanel(tid){var k=tid?"t":"g";
  q.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addPrint(tid);}});
  box.appendChild(mo);box.appendChild(co);
  box.appendChild(el("div",{class:"row"},[el("label",{},["Stückzahl ",q]),el("button",{class:"primary",type:"button",onclick:function(){addPrint(tid);}},["Hinzufügen"]),el("button",{type:"button",onclick:function(){JO[k]=false;render();}},["Schließen"])]));
- var P=(S.prints||[]).filter(function(p){return (p.tid||null)===(tid||null);});
- if(P.length){var ul=el("ul",{class:"pl2"});
-  P.forEach(function(x){ul.appendChild(el("li",{},[swatch(x.c),el("strong",{},[prText(x)]),el("button",{type:"button",onclick:function(){rmPrint(x,true);}},["Gedruckt"]),el("button",{type:"button","aria-label":"Löschen",onclick:function(){rmPrint(x,false);}},["✕"])]));});
-  box.appendChild(el("div",{style:"margin-top:10px"},[el("h2",{},["Druckliste"]),ul]));}
+ box.appendChild(el("div",{class:"meta",style:"margin-top:8px"},["Die Einträge stehen in der Druckliste ganz unten in der Übersicht."+(tid?" Offen aus diesem Todo: "+nPr(tid):"")]));
  return box;}
 function pn(x){return x.prio==null?1:x.prio;}
 function grp(x){return pn(x)===0?0:x.perm?1:pn(x)===1?2:3;}
@@ -206,7 +213,8 @@ function keep(){var a=document.activeElement;return a&&a.dataset&&a.dataset.k?{k
 function restore(f){if(!f)return;var n=document.querySelector('[data-k="'+f.k+'"]');if(!n)return;if(f.v!=null)n.value=f.v;n.focus();if(f.s!=null)try{n.setSelectionRange(f.s,f.e);}catch(e){}}
 function leaves(list,f){list.forEach(function(x){if(x.kids.length)leaves(x.kids,f);else f(x);});}
 function arch(x){leaves([x],function(l){if(l.done)S.log.push({id:l.id,at:l.doneAt||Date.now()});});}
-function sweep(){S.log=S.log||[];
+function sweep(){S.log=S.log||[];S.prints=S.prints||[];
+ S.items.slice().forEach(function(x){if(x.job&&!isDone(x)){S.prints.push({id:uid(),m:x.job.m,c:x.job.c,q:x.job.q,upd:Date.now()});tomb(x.id);S.items.splice(S.items.indexOf(x),1);}});
  S.items.slice().forEach(function(x){if(!x.kids.length||!isDone(x))return;
   arch(x);
   if(x.perm){x.kids.forEach(function(k){tomb(k.id);});x.kids=[];x.done=false;x.upd=Date.now();msg="Dauer-Todo „"+x.t+"“ ist geleert und wartet auf neue Aufgaben.";}
@@ -215,7 +223,7 @@ function kwNr(d){var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate(
 function stats(){var tot=0,dn=0,d=new Date(),k=(d.getDay()+6)%7,w0=new Date(d.getFullYear(),d.getMonth(),d.getDate()-k).getTime(),days=[0,0,0,0,0,0,0],wk=0;
  function cnt(at){if(at>=w0&&at<w0+6048e5){wk++;days[Math.min(6,Math.floor((at-w0)/864e5))]++;}}
  leaves(S.items,function(x){if(x.perm)return;tot++;if(x.done){dn++;if(x.doneAt)cnt(x.doneAt);}});
- var vs=0;(S.log||[]).forEach(function(l){if(l.vases){if(l.at>=w0&&l.at<w0+6048e5)vs+=l.vases;}else cnt(l.at);});
+ var vs=0;(S.log||[]).forEach(function(l){if(l.vases){if(l.at>=w0&&l.at<w0+6048e5)vs+=l.vases;}else cnt(l.at);});(S.prints||[]).forEach(function(p){if(p.done&&p.doneAt>=w0&&p.doneAt<w0+6048e5)vs+=p.q;});
  return {tot:tot,dn:dn,wk:wk,vs:vs,days:days,kw:kwNr(d)};}
 function statsBox(){var s=stats(),pct=s.tot?Math.round(100*s.dn/s.tot):0,mx=Math.max(1,Math.max.apply(null,s.days)),hero=el("div",{class:"ph",style:"left:"+pct+"%"});hero.innerHTML=FIG;
  var cols=s.days.map(function(n,i){return el("div",{class:"dc"},[el("div",{class:"db",style:"height:"+(4+Math.round(50*n/mx))+"px"}),el("span",{},[["Mo","Di","Mi","Do","Fr","Sa","So"][i]])]);});
@@ -257,6 +265,7 @@ function root(app){
  if(ps.length){var pnl=el("div",{class:"panel"},[el("h2",{class:"bad"},["Offene Probleme ("+ps.length+")"])]);
   ps.forEach(function(q){pnl.appendChild(el("button",{class:"pl",onclick:function(){go(q.trail.slice());sel=q.x.id;render();}},[names(q.trail).concat(q.x.t).join(" › ")]));});
   app.appendChild(pnl);}
+ var pl=printList();if(pl)app.appendChild(pl);
 }
 
 function icon(x,st){
@@ -406,6 +415,7 @@ fi.addEventListener("change",function(){var f=fi.files[0];if(!f)return;f.text().
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").then(function(reg){reg.addEventListener("updatefound",function(){var w=reg.installing;w.addEventListener("statechange",function(){
  if(w.state==="installed"&&navigator.serviceWorker.controller){var b=el("button",{class:"primary",onclick:function(){w.postMessage("skip");}},["Neue Version laden"]);document.getElementById("upd").replaceChildren(b);}});});});
 var rl=false;if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",function(){if(rl)return;rl=true;location.reload();});
+sweep();save();
 render();
 })();
 </script>
