@@ -62,6 +62,12 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .links a{color:var(--gold);overflow-wrap:anywhere}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.today{background:var(--surface);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin:0 0 10px;font-size:.9rem}
+.today h2{font-size:.95rem;margin:0 0 6px}
+.today ul{list-style:none;margin:0;padding:0}
+.today li{display:flex;gap:8px;padding:2px 0}
+.today .tm{color:var(--gold);min-width:3.6em}
+@media (min-width:1200px){.today{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:14px;width:270px;max-height:45vh;overflow:auto;z-index:5}}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
@@ -69,6 +75,7 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 <body>
 <main>
 <div class="bar"><button id="syncbtn" class="primary">Sync</button><span id="sync" class="meta">Nicht verbunden</span><button id="exp">Export</button><button id="imp">Import</button><span id="upd"></span><input type="file" id="file" accept=".json,application/json" hidden></div>
+<aside class="today" aria-label="Termine heute"><h2>Heute</h2><div id="ev" class="meta">Mit Sync anmelden, um die Termine zu sehen.</div></aside>
 <p class="msg" id="msg" role="status" aria-live="polite"></p>
 <div id="app"></div>
 <p class="note">Daten liegen lokal im Browser und werden per Sync in deinem Google-Drive-App-Ordner abgeglichen. Backup über Export.</p>
@@ -223,14 +230,33 @@ function push(){var body=JSON.stringify(S);
 function syncNow(){if(busy)return;if(!tok||Date.now()>tokExp){st("Sync pausiert, Sync-Button drücken");return;}
  busy=true;st("Synchronisiere …");
  pull().then(function(rem){if(rem){if((rem.v||1)>(S.v||1))throw new Error("VER");S=mergeState(S,rem);save();render();}return push();})
- .then(function(){st("Synchronisiert "+new Date().toLocaleTimeString("de-DE"));})
+ .then(function(){st("Synchronisiert "+new Date().toLocaleTimeString("de-DE"));cal();snap();})
  .catch(function(e){st(e.message==="VER"?"Datei ist neuer als diese App, bitte App aktualisieren":"Sync-Fehler: "+e.message);})
  .then(function(){busy=false;});}
 function sched(){if(!tok)return;clearTimeout(timer);timer=setTimeout(syncNow,3000);}
 function login(){if(!window.google||!google.accounts){st("Google-Skript nicht geladen (offline?)");return;}
- if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.appdata",callback:function(r){
+ if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.readonly",callback:function(r){
   if(r.access_token){tok=r.access_token;tokExp=Date.now()+(r.expires_in-60)*1000;syncNow();}else st("Anmeldung fehlgeschlagen");}});
  tc.requestAccessToken();}
+function cal(){var ev=document.getElementById("ev");if(!tok)return;
+ var a=new Date();a.setHours(0,0,0,0);var b=new Date(a);b.setDate(b.getDate()+1);
+ gf("https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=20&timeMin="+encodeURIComponent(a.toISOString())+"&timeMax="+encodeURIComponent(b.toISOString())).then(function(r){return r.json();}).then(function(j){
+  var it=j.items||[];ev.replaceChildren();
+  if(!it.length){ev.textContent="Heute keine Termine.";return;}
+  var ul=el("ul");it.forEach(function(e){var s=e.start||{},tm=s.dateTime?new Date(s.dateTime).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}):"ganztägig";
+   ul.appendChild(el("li",{},[el("span",{class:"tm"},[tm]),el("span",{},[e.summary||"(ohne Titel)"])]));});
+  ev.appendChild(ul);}).catch(function(e){ev.textContent="Kalender nicht verfügbar ("+e.message+")";});}
+setInterval(cal,600000);
+function snapLines(){var L=[],P=[];
+ function walk(x,tr){tr=tr.concat(x.t);var c=x.kids.filter(function(k){return !isDone(k);})[0];if(c)walk(c,tr);else L.push(tr.join(" › "));}
+ (function pr(list,tr){list.forEach(function(x){if(x.problem&&!isDone(x))P.push(tr.concat(x.t).join(" › "));pr(x.kids,tr.concat(x.t));});})(S.items,[]);
+ S.items.forEach(function(x){if(!isDone(x))walk(x,[]);});
+ return {at:new Date().toISOString(),todos:L,problems:P};}
+function snap(){var body=JSON.stringify(snapLines()),N="weg-snapshot.json";
+ gf(API+"drive/v3/files?fields=files(id)&q="+encodeURIComponent("name='"+N+"' and trashed=false")).then(function(r){return r.json();}).then(function(j){
+  if(j.files.length)return gf(API+"upload/drive/v3/files/"+j.files[0].id+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body:body});
+  var b="b"+uid(),m="--"+b+"\r\nContent-Type: application/json\r\n\r\n"+JSON.stringify({name:N})+"\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+body+"\r\n--"+b+"--";
+  return gf(API+"upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:m});}).catch(function(){});}
 document.getElementById("syncbtn").addEventListener("click",function(){if(tok&&Date.now()<tokExp)syncNow();else login();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden)syncNow();});
 document.getElementById("exp").addEventListener("click",function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:"application/json"}));a.download="weg-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();});
