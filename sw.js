@@ -3,4 +3,4 @@ self.addEventListener("install",function(e){e.waitUntil(caches.open(V).then(func
 self.addEventListener("activate",function(e){e.waitUntil(caches.keys().then(function(k){return Promise.all(k.filter(function(n){return n!==V;}).map(function(n){return caches.delete(n);}));}).then(function(){return self.clients.claim();}));});
 self.addEventListener("message",function(e){if(e.data==="skip")self.skipWaiting();});
 self.addEventListener("fetch",function(e){var u=new URL(e.request.url);if(e.request.method!=="GET"||u.origin!==location.origin)return;
- e.respondWith(caches.match(e.request).then(function(r){return r||fetch(e.request);}));});
+ e.respondWith(fetch(e.request).then(function(r){var c=r.clone();caches.open(V).then(function(k){k.put(e.request,c);});return r;}).catch(function(){return caches.match(e.request);}));});
