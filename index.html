@@ -118,6 +118,8 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .pl2 li:first-child{border-top:0}
 .pl2 li strong{flex:1;font-size:1.1rem;min-width:8em}
 .pl2 button{padding:3px 10px;font-size:.88rem}
+.pico svg{width:16px;height:16px;vertical-align:-3px}
+.chk{display:flex;gap:8px;align-items:center;font-size:.9rem}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
@@ -139,7 +141,7 @@ function uid(){return Math.random().toString(36).slice(2,9);}
 function el(tag,a,kids){var n=document.createElement(tag);
  for(var k in (a||{})){var v=a[k];if(k==="class")n.className=v;else if(k.slice(0,2)==="on")n.addEventListener(k.slice(2),v);else if(v===true)n.setAttribute(k,"");else if(v!==false&&v!=null)n.setAttribute(k,v);}
  (kids||[]).forEach(function(c){if(c)n.appendChild(typeof c==="string"?document.createTextNode(c):c);});return n;}
-function isDone(x){return x.kids.length?x.kids.every(isDone):!!x.done;}
+function isDone(x){if(x.aest&&nPr(x.id))return false;return x.kids.length?x.kids.every(isDone):!!x.done;}
 function count(x){var d=0;x.kids.forEach(function(k){if(isDone(k))d++;});return [d,x.kids.length];}
 function hasProb(x){return x.kids.some(function(k){return (k.problem&&!isDone(k))||hasProb(k);});}
 function nodeAt(path){var l=S.items,n=null;path.forEach(function(id){n=l.filter(function(y){return y.id===id;})[0];l=n?n.kids:[];});return n;}
@@ -161,10 +163,12 @@ function gearBox(x){var t=el("input",{type:"text",value:x.t,maxlength:"200","ari
  function sv(){var v=t.value.trim();if(v&&v!==x.t){x.t=v;x.upd=Date.now();save();sched();}}
  t.addEventListener("change",sv);
  t.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();sv();gearId=null;render();}});
+ var cb=el("input",{type:"checkbox"});cb.checked=!!x.aest;
+ cb.addEventListener("change",function(){sv();if(!cb.checked&&nPr(x.id)){msg="Erst die Druckliste dieses Todos leeren.";cb.checked=true;return render();}x.aest=cb.checked;x.upd=Date.now();commit();});
  return el("div",{class:"gearbox"},[el("label",{class:"meta"},["Name",t]),
   el("div",{class:"row"},[el("button",{class:"tg"+(x.perm?" on":""),type:"button","aria-pressed":x.perm?"true":"false",onclick:function(){sv();x.perm=!x.perm;x.upd=Date.now();commit();}},["Dauerhaft: "+(x.perm?"an":"aus")]),
    el("button",{class:"primary",type:"button",onclick:function(){sv();gearId=null;render();}},["Fertig"])]),
-  el("div",{class:"meta"},["Dauerhaft: das Todo bleibt bestehen, auch wenn alle Stationen erledigt sind, und wird immer wieder neu gefüllt."])]);}
+  el("label",{class:"chk"},[cb," Aesterior: Vasenmenü in diesem Todo"]),el("div",{class:"meta"},["Dauerhaft: das Todo bleibt bestehen, auch wenn alle Stationen erledigt sind, und wird immer wieder neu gefüllt."])]);}
 function seg(cur,set){var d=el("div",{class:"seg",role:"group","aria-label":"Wichtigkeit"});
  PN.forEach(function(n,i){d.appendChild(el("button",{type:"button",class:"s p"+i+(cur===i?" on":""),"aria-pressed":cur===i?"true":"false",onclick:function(){set(i);[].forEach.call(d.children,function(b,j){b.classList.toggle("on",j===i);b.setAttribute("aria-pressed",j===i?"true":"false");});}},[n]));});return d;}
 var CA=["sandgrau","butterlemongelb","matcha-grün","helllila","orange","weiß","blaugrau","altrosa","schwarz"],CB=CA.concat(["dunkelgrün","betongrau","hellrosa","pink"]);
@@ -173,20 +177,22 @@ var SW={"sandgrau":"#b9ae9c","butterlemongelb":"#f2e08a","matcha-grün":"#a8c18b
 var jobOpen=true,jm=0,jc=null,jq=1;
 function swatch(c){return el("span",{class:"sw",style:"background:"+(SW[c]||"#888")});}
 function prText(x){return (x.q>1?x.q+" ":"")+x.m+" "+x.c;}
-function addPrint(){var v=VM[jm];if(!jc||v.c.indexOf(jc)<0){msg="Bitte erst eine Farbe wählen.";if(FINE)af="job-qty";return render();}
- S.prints=S.prints||[];S.prints.push({id:uid(),m:v.n,c:jc,q:Math.max(1,Math.min(999,jq|0)),upd:Date.now()});jq=1;msg="";if(FINE)af="job-qty";commit();}
+function nPr(id){return (S.prints||[]).filter(function(p){return p.tid===id;}).length;}
+var JO={g:true,t:true};
+function addPrint(tid){var v=VM[jm];if(!jc||v.c.indexOf(jc)<0){msg="Bitte erst eine Farbe wählen.";if(FINE)af="job-qty";return render();}
+ S.prints=S.prints||[];var e={id:uid(),m:v.n,c:jc,q:Math.max(1,Math.min(999,jq|0)),upd:Date.now()};if(tid)e.tid=tid;S.prints.push(e);jq=1;msg="";if(FINE)af="job-qty";commit();}
 function rmPrint(x,done){if(done){S.log=S.log||[];S.log.push({id:x.id+"-job",at:Date.now(),vases:x.q});}tomb(x.id);S.prints.splice(S.prints.indexOf(x),1);commit();}
-function jobPanel(){
- if(!jobOpen)return el("button",{class:"primary",style:"margin:0 0 12px",onclick:function(){jobOpen=true;if(FINE)af="job-qty";render();}},["＋ Vasen drucken"]);
+function jobPanel(tid){var k=tid?"t":"g";
+ if(!JO[k])return el("button",{class:"primary",style:"margin:0 0 12px",onclick:function(){JO[k]=true;if(FINE)af="job-qty";render();}},["＋ Vasen drucken"]);
  var v=VM[jm],box=el("div",{class:"panel job"},[el("h2",{},["Vasen drucken"])]);
  var mo=el("div",{class:"opts"});VM.forEach(function(x,i){mo.appendChild(el("button",{type:"button",class:"opt"+(i===jm?" on":""),onclick:function(){jm=i;if(VM[i].c.indexOf(jc)<0)jc=null;if(FINE)af="job-qty";render();}},[x.n+" "+x.h+" cm"]));});
  var co=el("div",{class:"opts"});v.c.forEach(function(c){co.appendChild(el("button",{type:"button",class:"opt"+(c===jc?" on":""),onclick:function(){jc=c;if(FINE)af="job-qty";render();}},[swatch(c),c]));});
  var q=el("input",{type:"number",min:"1",max:"999",value:String(jq),"aria-label":"Stückzahl","data-k":"job-qty"});
  q.addEventListener("input",function(){jq=Math.max(1,parseInt(q.value,10)||1);});
- q.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addPrint();}});
+ q.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addPrint(tid);}});
  box.appendChild(mo);box.appendChild(co);
- box.appendChild(el("div",{class:"row"},[el("label",{},["Stückzahl ",q]),el("button",{class:"primary",type:"button",onclick:addPrint},["Hinzufügen"]),el("button",{type:"button",onclick:function(){jobOpen=false;render();}},["Schließen"])]));
- var P=S.prints||[];
+ box.appendChild(el("div",{class:"row"},[el("label",{},["Stückzahl ",q]),el("button",{class:"primary",type:"button",onclick:function(){addPrint(tid);}},["Hinzufügen"]),el("button",{type:"button",onclick:function(){JO[k]=false;render();}},["Schließen"])]));
+ var P=(S.prints||[]).filter(function(p){return (p.tid||null)===(tid||null);});
  if(P.length){var ul=el("ul",{class:"pl2"});
   P.forEach(function(x){ul.appendChild(el("li",{},[swatch(x.c),el("strong",{},[prText(x)]),el("button",{type:"button",onclick:function(){rmPrint(x,true);}},["Gedruckt"]),el("button",{type:"button","aria-label":"Löschen",onclick:function(){rmPrint(x,false);}},["✕"])]));});
   box.appendChild(el("div",{style:"margin-top:10px"},[el("h2",{},["Druckliste"]),ul]));}
@@ -194,6 +200,7 @@ function jobPanel(){
 function pn(x){return x.prio==null?1:x.prio;}
 function grp(x){return pn(x)===0?0:x.perm?1:pn(x)===1?2:3;}
 function permIco(x){return x.perm?[el("span",{class:"pico",title:"Dauerhaftes Todo"},["↻"])]:[];}
+function aestIco(x){if(!x.aest)return [];var v=el("span",{class:"pico",title:"Aesterior: Vasenmenü"});v.innerHTML='<svg viewBox="0 0 24 24"><path d="M9 3h6v3c0 2 3 3 3 8a6 6 0 0 1-12 0c0-5 3-6 3-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';return [v];}
 var STAR='<svg viewBox="0 0 44 44"><polygon points="22,3 28,16 42,17 31,27 34,41 22,34 10,41 13,27 2,17 16,16" fill="currentColor"/></svg>';
 function keep(){var a=document.activeElement;return a&&a.dataset&&a.dataset.k?{k:a.dataset.k,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;}
 function restore(f){if(!f)return;var n=document.querySelector('[data-k="'+f.k+'"]');if(!n)return;if(f.v!=null)n.value=f.v;n.focus();if(f.s!=null)try{n.setSelectionRange(f.s,f.e);}catch(e){}}
@@ -237,10 +244,10 @@ function root(app){
  var ul=el("ul",{class:"roots"});
  S.items.slice().sort(function(a,b){return grp(a)-grp(b)||pn(a)-pn(b);}).forEach(function(x){var c=count(x),dn=isDone(x),pr=pn(x);
   ul.appendChild(el("li",{class:(dn&&!x.perm?"dn ":"")+"clk L"+pr,tabindex:"0",onclick:function(e){if(e.target.closest("button,input,a,select,label,.gearbox"))return;go([x.id]);},onkeydown:function(e){if(e.key==="Enter"&&e.target===e.currentTarget)go([x.id]);}},[
-   el("div",{class:"t"},[x.job?swatch(x.job.c):null].concat(permIco(x),[(x.problem&&!dn?"! ":"")+x.t])),
+   el("div",{class:"t"},[x.job?swatch(x.job.c):null].concat(aestIco(x),permIco(x),[(x.problem&&!dn?"! ":"")+x.t])),
    seg(pr,function(i){x.prio=i;x.upd=Date.now();commit();}),
    el("button",{class:"gear","aria-label":"Einstellungen",title:"Name ändern, Dauerhaft",onclick:function(){gearId=gearId===x.id?null:x.id;render();}},["⚙"]),
-   el("span",{class:"meta"},[c[1]?c[0]+" von "+c[1]+" Stationen":""]),
+   el("span",{class:"meta"},[(c[1]?c[0]+" von "+c[1]+" Stationen":"")+(x.aest&&nPr(x.id)?" · "+nPr(x.id)+" in der Druckliste":"")]),
    hasProb(x)?el("span",{class:"bad"},["Problem enthalten"]):null,
    
    !x.kids.length&&!x.perm?el("button",{onclick:function(){x.done=!x.done;x.doneAt=x.done?Date.now():0;x.upd=Date.now();commit();}},[x.done?"Wieder öffnen":"Erledigt"]):null,
@@ -297,6 +304,7 @@ function path(app){
  var mkc=function(pr){var v=inp.value;inp.value="";af="new-station";addTo(list,v,pc.checked,node,pr);};
  inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();mkc(1);}});
  app.appendChild(el("form",{class:"add",onsubmit:function(e){e.preventDefault();}},[inp,el("label",{for:"pc"},[pc," Problem"]),mkBtns(mkc)]));
+ if(nav.length===1&&node.aest)app.appendChild(jobPanel(node.id));
 }
 
 function detail(list,x,cur,node){
