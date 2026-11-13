@@ -122,6 +122,17 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .chk{display:flex;gap:8px;align-items:center;font-size:.9rem}
 .pl2 li.dn strong,.pl2 li.dn .sw{opacity:.55}.pl2 li.dn strong{text-decoration:line-through}
 .pl2 input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold);flex:none}
+.daily{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:.78rem}
+.daily .dh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.daily .dh strong{font-size:.8rem}.daily .st2{color:var(--gold);font-weight:700}
+.daily ul{list-style:none;margin:4px 0 0;padding:0}
+.daily li{display:flex;align-items:center;gap:6px;padding:1px 0}
+.daily li span{flex:1;overflow-wrap:anywhere}.daily li.dn span{text-decoration:line-through;color:var(--mute)}
+.daily input[type=checkbox]{width:14px;height:14px;accent-color:var(--gold);margin:0;flex:none}
+.daily button{padding:0 7px;font-size:.8rem;line-height:1.5;border-radius:4px}
+.daily .x{border:0;opacity:.45;padding:0 4px}
+.daily input[type=text]{width:100%;margin-top:4px;padding:2px 6px;font-size:.78rem}
+@media (min-width:1200px){.side{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:14px;width:270px;max-height:calc(100vh - 24px);overflow:auto;z-index:5}.side .today{position:static;width:auto;max-height:40vh}}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
@@ -129,7 +140,7 @@ ul.roots{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 <body>
 <main>
 <div class="bar"><button id="syncbtn" class="primary">Sync</button><span id="sync" class="meta">Nicht verbunden</span><button id="exp">Export</button><button id="imp">Import</button><span id="upd"></span><input type="file" id="file" accept=".json,application/json" hidden></div>
-<aside class="today" aria-label="Termine heute"><h2>Heute</h2><div id="ev" class="meta">Mit Sync anmelden, um die Termine zu sehen.</div></aside>
+<div class="side"><aside class="today" aria-label="Termine heute"><h2>Heute</h2><div id="ev" class="meta">Mit Sync anmelden, um die Termine zu sehen.</div></aside><aside class="daily" id="daily" aria-label="Tägliche Todos"></aside></div>
 <p class="msg" id="msg" role="status" aria-live="polite"></p>
 <div id="app"></div>
 <p class="note">Daten liegen lokal im Browser und werden per Sync in deinem Google-Drive-App-Ordner abgeglichen. Backup über Export.</p>
@@ -205,6 +216,27 @@ function jobPanel(tid){var k=tid?"t":"g";
  box.appendChild(el("div",{class:"meta",style:"margin-top:8px"},["Jedes Stück kommt als eigene Zeile in die Druckliste ganz unten in der Übersicht."+(tid?" Offen aus diesem Todo: "+nPr(tid):"")]));
  return box;}
 function pn(x){return x.prio==null?1:x.prio;}
+var dOpen=false,lastDay="";
+function dayKey(t){var d=new Date((t||Date.now())-5*36e5);return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);}
+function ds(){return S.dstreak||(S.dstreak={n:0,last:"",upd:0});}
+function dtick(){var d=S.dstreak;if(!d||!d.n)return;if(d.last!==dayKey()&&d.last!==dayKey(Date.now()-864e5)){d.n=0;d.p=null;d.upd=Date.now();save();sched();}}
+function evalDaily(rev){var d=ds(),t=dayKey(),L=S.daily||[],all=L.length>0&&L.every(function(i){return i.dd===t;});
+ if(all&&d.last!==t){d.p={n:d.n||0,last:d.last};d.n=(d.n||0)+1;d.last=t;d.upd=Date.now();}
+ else if(rev&&!all&&d.last===t&&d.p){d.n=d.p.n;d.last=d.p.last;d.p=null;d.upd=Date.now();}}
+function renderDaily(){var box=document.getElementById("daily");if(!box)return;dtick();box.replaceChildren();lastDay=dayKey();
+ var d=ds(),t=dayKey(),L=S.daily||[],nd=L.filter(function(i){return i.dd===t;}).length;
+ box.appendChild(el("div",{class:"dh"},[el("strong",{},["Täglich "+nd+"/"+L.length]),el("span",{class:"st2",title:"Streak: Tage in Folge, an denen alles erledigt war"},["Streak "+(d.n||0)]),
+  el("button",{type:"button","aria-label":"Tägliches Todo hinzufügen","aria-expanded":dOpen?"true":"false",onclick:function(){dOpen=!dOpen;if(dOpen)af="dl-new";render();}},[dOpen?"−":"+"])]));
+ if(L.length){var ul=el("ul");
+  L.forEach(function(x){var cb=el("input",{type:"checkbox","aria-label":x.t});cb.checked=x.dd===t;
+   cb.addEventListener("change",function(){x.dd=cb.checked?dayKey():"";x.upd=Date.now();evalDaily(!cb.checked);commit();});
+   ul.appendChild(el("li",{class:x.dd===t?"dn":""},[cb,el("span",{},[x.t]),el("button",{type:"button",class:"x","aria-label":"Entfernen",onclick:function(){tomb(x.id);S.daily.splice(S.daily.indexOf(x),1);evalDaily(false);commit();}},["✕"])]));});
+  box.appendChild(ul);}
+ if(dOpen){var inp=el("input",{type:"text",placeholder:"Neues tägliches Todo, Enter",maxlength:"80","aria-label":"Neues tägliches Todo","data-k":"dl-new"});
+  inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();var v=inp.value.trim();if(!v)return;inp.value="";S.daily=S.daily||[];S.daily.push({id:uid(),t:v,dd:"",upd:Date.now()});af="dl-new";commit();}
+   else if(e.key==="Escape"){dOpen=false;render();}});
+  box.appendChild(inp);}}
+
 function grp(x){return pn(x)===0?0:x.perm?1:pn(x)===1?2:3;}
 function permIco(x){return x.perm?[el("span",{class:"pico",title:"Dauerhaftes Todo"},["↻"])]:[];}
 function aestIco(x){if(!x.aest)return [];var v=el("span",{class:"pico",title:"Aesterior: Vasenmenü"});v.innerHTML='<svg viewBox="0 0 24 24"><path d="M9 3h6v3c0 2 3 3 3 8a6 6 0 0 1-12 0c0-5 3-6 3-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';return [v];}
@@ -356,7 +388,7 @@ function render(){
  document.getElementById("msg").textContent=msg;
  var fk=keep()||(af?{k:af}:null);af=null;var app=document.getElementById("app");app.replaceChildren();
  if(nav.length)path(app);else root(app);
- restore(fk);
+ renderDaily();restore(fk);
 }
 var CLIENT_ID="922608704073-lv2jnan8fjohrlp29fknpf0k0gke7al7.apps.googleusercontent.com",tok=null,tokExp=0,tc=null,busy=false,timer=null,fid=null;
 try{fid=localStorage.getItem(KEY+"-fid");}catch(e){}
@@ -369,7 +401,7 @@ function mergeList(a,b,del){var m={},out=[];b.forEach(function(x){m[x.id]=x;});
  b.forEach(function(y){if(m[y.id])out.push(y);});
  return out.filter(function(x){return !(del[x.id]&&del[x.id]>(x.upd||0));});}
 function mergeState(a,b){var d=Object.assign({},a.deleted||{});var bd=b.deleted||{};for(var k in bd)d[k]=Math.max(d[k]||0,bd[k]);
- return Object.assign({},b,a,{v:Math.max(a.v||1,b.v||1),deleted:d,items:mergeList(a.items||[],b.items||[],d),prints:mergeList(a.prints||[],b.prints||[],d),log:(function(){var m={};(a.log||[]).concat(b.log||[]).forEach(function(l){m[l.id]=l;});return Object.keys(m).map(function(k){return m[k];});})()});}
+ return Object.assign({},b,a,{v:Math.max(a.v||1,b.v||1),deleted:d,items:mergeList(a.items||[],b.items||[],d),prints:mergeList(a.prints||[],b.prints||[],d),daily:mergeList(a.daily||[],b.daily||[],d),dstreak:(((b.dstreak&&b.dstreak.upd)||0)>((a.dstreak&&a.dstreak.upd)||0))?b.dstreak:a.dstreak,log:(function(){var m={};(a.log||[]).concat(b.log||[]).forEach(function(l){m[l.id]=l;});return Object.keys(m).map(function(k){return m[k];});})()});}
 function gf(url,o){o=o||{};o.headers=Object.assign({Authorization:"Bearer "+tok},o.headers||{});
  return fetch(url,o).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r;});}
 var API="https://www.googleapis.com/";
@@ -419,6 +451,7 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").then(f
  if(w.state==="installed"&&navigator.serviceWorker.controller){var b=el("button",{class:"primary",onclick:function(){w.postMessage("skip");}},["Neue Version laden"]);document.getElementById("upd").replaceChildren(b);}});});});
 var rl=false;if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",function(){if(rl)return;rl=true;location.reload();});
 sweep();save();
+setInterval(function(){var k=dayKey();if(k!==lastDay){dtick();render();}},60000);
 render();
 })();
 </script>
