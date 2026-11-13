@@ -449,7 +449,7 @@ function snapLines(){var L=[],P=[],U=[],D=[];
  function walk(x,tr){tr=tr.concat(x.t);var c=x.kids.filter(function(k){return !isDone(k);})[0];if(c)walk(c,tr);else L.push(tr.join(" › "));}
  (function pr(list,tr){list.forEach(function(x){if(x.problem&&!isDone(x))P.push(tr.concat(x.t).join(" › "));pr(x.kids,tr.concat(x.t));});})(S.items,[]);
  S.items.slice().sort(function(a,b){return grp(a)-grp(b)||pn(a)-pn(b);}).forEach(function(x){if(isDone(x)||(x.perm&&!x.kids.length))return;var n=L.length;walk(x,[]);if(x.prio===0){U.push(L[n]);L[n]="DRINGEND: "+L[n];}});
- (function dd(list,tr){list.forEach(function(x){var t=tr.concat(x.t);if(x.due&&!isDone(x)&&!isNaN(new Date(x.due)))D.push({id:x.id,t:t.join(" › "),due:new Date(x.due).toISOString()});dd(x.kids,t);});})(S.items,[]);
+ (function dd(list,tr){list.forEach(function(x){var t=tr.concat(x.t);if(x.due&&!isDone(x)&&!isNaN(new Date(x.due)))D.push({id:x.id,n:x.t,p:tr.join(" › "),t:t.join(" › "),due:new Date(x.due).toISOString()});dd(x.kids,t);});})(S.items,[]);
  return {at:new Date().toISOString(),todos:L,urgent:U,problems:P,due:D};}
 function snap(){var body=JSON.stringify(snapLines()),N="weg-snapshot.json";
  gf(API+"drive/v3/files?fields=files(id)&q="+encodeURIComponent("name='"+N+"' and trashed=false")).then(function(r){return r.json();}).then(function(j){
