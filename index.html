@@ -142,14 +142,20 @@ input[type=datetime-local],textarea{padding:7px 10px;border:1px solid var(--line
 .daily li label{display:flex;align-items:center;gap:6px;flex:1;min-width:0;cursor:pointer}
 .shop{font-size:.9rem}.shop li{padding:4px 0}.shop input[type=checkbox]{width:18px;height:18px}
 .shop ul{max-height:40vh;overflow:auto}
+.reauthb{width:100%;padding:12px;font-size:1.05rem;font-weight:700;margin:6px 0}
+#conn input{margin-top:0}
+html.nosync body::after{content:"";position:fixed;inset:0;border:6px solid #e03a3a;pointer-events:none;z-index:9999}
+html.nosync #sync{color:#e03a3a;font-weight:700}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
 </head>
 <body>
 <main>
-<div class="bar"><button id="syncbtn" class="primary">Sync</button><span id="sync" class="meta">Nicht verbunden</span><button id="exp">Export</button><button id="imp">Import</button><span id="upd"></span><input type="file" id="file" accept=".json,application/json" hidden></div>
+<div class="bar"><button id="syncbtn" class="primary">Sync</button><span id="sync" class="meta">Nicht verbunden</span><button id="exp">Export</button><button id="imp">Import</button><button id="conbtn">Server</button><span id="upd"></span><input type="file" id="file" accept=".json,application/json" hidden></div>
 <div class="side"><aside class="today" aria-label="Termine heute"><h2>Heute</h2><div id="ev" class="meta">Mit Sync anmelden, um die Termine zu sehen.</div></aside><aside class="daily" id="daily" aria-label="Tägliche Todos"></aside><aside class="daily shop" id="shop" aria-label="Einkaufsliste"></aside></div>
+<div id="reauth"></div>
+<div id="conn"></div>
 <p class="msg" id="msg" role="status" aria-live="polite"></p>
 <div id="app"></div>
 <p class="note">Daten liegen lokal im Browser und werden per Sync in deinem Google-Drive-App-Ordner abgeglichen. Backup über Export.</p>
@@ -423,7 +429,11 @@ function render(){
 var CLIENT_ID="922608704073-lv2jnan8fjohrlp29fknpf0k0gke7al7.apps.googleusercontent.com",tok=null,tokExp=0,tc=null,busy=false,timer=null,fid=null;
 try{fid=localStorage.getItem(KEY+"-fid");}catch(e){}
 function tomb(id){S.deleted[id]=Date.now();}
-function st(t){document.getElementById("sync").textContent=t;}
+var lastOk=0;
+function frame(on){document.documentElement.classList.toggle("nosync",!!on);}
+function st(t){document.getElementById("sync").textContent=t;
+ if(/^Synchronisiert/.test(t)){lastOk=Date.now();frame(false);}else if(/^Synchronisiere/.test(t)){}else frame(true);}
+setInterval(function(){if(!document.hidden&&lastOk&&!busy&&Date.now()-lastOk>9e5)frame(true);},30000);
 function mergeList(a,b,del){var m={},out=[];b.forEach(function(x){m[x.id]=x;});
  a.forEach(function(x){var y=m[x.id],w;delete m[x.id];
   if(y){w=Object.assign({},(y.upd||0)>(x.upd||0)?y:x);w.kids=mergeList(x.kids||[],y.kids||[],del);}else w=x;
@@ -433,7 +443,7 @@ function mergeList(a,b,del){var m={},out=[];b.forEach(function(x){m[x.id]=x;});
 function mergeState(a,b){var d=Object.assign({},a.deleted||{});var bd=b.deleted||{};for(var k in bd)d[k]=Math.max(d[k]||0,bd[k]);
  return Object.assign({},b,a,{v:Math.max(a.v||1,b.v||1),deleted:d,items:mergeList(a.items||[],b.items||[],d),prints:mergeList(a.prints||[],b.prints||[],d),daily:mergeList(a.daily||[],b.daily||[],d),shop:mergeList(a.shop||[],b.shop||[],d),dstreak:(((b.dstreak&&b.dstreak.upd)||0)>((a.dstreak&&a.dstreak.upd)||0))?b.dstreak:a.dstreak,log:(function(){var m={};(a.log||[]).concat(b.log||[]).forEach(function(l){m[l.id]=l;});return Object.keys(m).map(function(k){return m[k];});})()});}
 function gf(url,o){o=o||{};o.headers=Object.assign({Authorization:"Bearer "+tok},o.headers||{});
- return fetch(url,o).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r;});}
+ return fetch(url,o).then(function(r){if(r.status===401)tokExp=0;if(!r.ok)throw new Error("HTTP "+r.status);return r;});}
 var API="https://www.googleapis.com/";
 function pull(){return gf(API+"drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+encodeURIComponent("name='weg.json'")).then(function(r){return r.json();}).then(function(j){
  if(!j.files.length){fid=null;return null;}fid=j.files[0].id;
@@ -442,26 +452,66 @@ function push(){var body=JSON.stringify(S);
  if(fid)return gf(API+"upload/drive/v3/files/"+fid+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body:body});
  var b="b"+uid(),m="--"+b+"\r\nContent-Type: application/json\r\n\r\n"+JSON.stringify({name:"weg.json",parents:["appDataFolder"]})+"\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+body+"\r\n--"+b+"--";
  return gf(API+"upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:m}).then(function(r){return r.json();}).then(function(j){fid=j.id;try{localStorage.setItem(KEY+"-fid",fid);}catch(e){}});}
-function syncNow(){if(busy)return;if(!tok||Date.now()>tokExp){st("Sync pausiert, Sync-Button drücken");return;}
+function syncNow(){if(busy)return;if(BE){syncBE();return;}if(!tok||Date.now()>tokExp){needLogin();return;}
  busy=true;st("Synchronisiere …");
  pull().then(function(rem){if(rem){if((rem.v||1)>(S.v||1))throw new Error("VER");var bf=JSON.stringify(S);S=mergeState(S,rem);if(JSON.stringify(S)!==bf){save();render();}}return push();})
  .then(function(){st("Synchronisiert "+new Date().toLocaleTimeString("de-DE"));cal();snap();})
- .catch(function(e){st(e.message==="VER"?"Datei ist neuer als diese App, bitte App aktualisieren":"Sync-Fehler: "+e.message);})
+ .catch(errSt)
  .then(function(){busy=false;});}
-function sched(){if(!tok)return;clearTimeout(timer);timer=setTimeout(syncNow,3000);}
-function login(){if(!window.google||!google.accounts){st("Google-Skript nicht geladen (offline?)");return;}
- if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.readonly",callback:function(r){
-  if(r.access_token){tok=r.access_token;tokExp=Date.now()+(r.expires_in-60)*1000;syncNow();}else st("Anmeldung fehlgeschlagen");}});
- tc.requestAccessToken();}
-function cal(){var ev=document.getElementById("ev");if(!tok)return;
+function sched(){if(!canSync())return;clearTimeout(timer);timer=setTimeout(syncNow,3000);}
+function showEv(L){var ev=document.getElementById("ev");ev.replaceChildren();if(!L.length){ev.textContent="Heute keine Termine.";return;}
+ var ul=el("ul");L.forEach(function(e){ul.appendChild(el("li",{},[el("span",{class:"tm"},[e.z]),el("span",{},[e.t])]));});ev.appendChild(ul);}
+function cal(){var ev=document.getElementById("ev");
+ if(BE){beCall({action:"cal"}).then(function(j){showEv(j.ev||[]);}).catch(function(e){ev.textContent="Kalender nicht verfügbar ("+e.message+")";});return;}
+ if(!tok||Date.now()>tokExp)return;
  var a=new Date();a.setHours(0,0,0,0);var b=new Date(a);b.setDate(b.getDate()+1);
  gf("https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=20&timeMin="+encodeURIComponent(a.toISOString())+"&timeMax="+encodeURIComponent(b.toISOString())).then(function(r){return r.json();}).then(function(j){
-  var it=j.items||[];ev.replaceChildren();
-  if(!it.length){ev.textContent="Heute keine Termine.";return;}
-  var ul=el("ul");it.forEach(function(e){var s=e.start||{},tm=s.dateTime?new Date(s.dateTime).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}):"ganztägig";
-   ul.appendChild(el("li",{},[el("span",{class:"tm"},[tm]),el("span",{},[e.summary||"(ohne Titel)"])]));});
-  ev.appendChild(ul);}).catch(function(e){ev.textContent="Kalender nicht verfügbar ("+e.message+")";});}
+  showEv((j.items||[]).map(function(e){var s=e.start||{};return {z:s.dateTime?new Date(s.dateTime).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}):"ganztägig",t:e.summary||"(ohne Titel)"};}));}).catch(function(e){ev.textContent="Kalender nicht verfügbar ("+e.message+")";});}
 setInterval(cal,600000);
+/* ---- Anmeldung (Rückfallweg ohne Server): Zugang erneuern, Hinweis bei Ablauf ---- */
+var authed=false,silentBusy=false;try{authed=localStorage.getItem(KEY+"-auth")==="1";}catch(e){}
+function showReauth(on){var r=document.getElementById("reauth");r.replaceChildren();
+ if(on&&!BE)r.appendChild(el("button",{class:"primary reauthb",onclick:function(){login(false);}},["Anmeldung abgelaufen – hier tippen"]));}
+function needLogin(){if(authed){st("Anmeldung abgelaufen, Änderungen bleiben lokal");showReauth(true);}else st("Nicht verbunden, Sync drücken");}
+function login(silent){
+ if(!window.google||!google.accounts){silentBusy=false;if(!silent)st("Google-Skript nicht geladen (offline?)");return;}
+ if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.readonly",
+  callback:function(r){silentBusy=false;
+   if(r&&r.access_token){tok=r.access_token;tokExp=Date.now()+(r.expires_in-60)*1000;authed=true;try{localStorage.setItem(KEY+"-auth","1");}catch(e){}showReauth(false);syncNow();}
+   else{st("Anmeldung fehlgeschlagen");if(authed)showReauth(true);}},
+  error_callback:function(){silentBusy=false;if(authed){st("Anmeldung abgelaufen, Änderungen bleiben lokal");showReauth(true);}else st("Anmeldung abgebrochen");}});
+ tc.requestAccessToken(silent?{prompt:""}:{});}
+function keepAlive(){if(BE||!authed||silentBusy||document.hidden)return;
+ if(!tok||Date.now()>tokExp-3e5){silentBusy=true;setTimeout(function(){silentBusy=false;},20000);login(true);}}
+setInterval(keepAlive,60000);
+/* ---- Server-Weg (Apps-Script-Schnittstelle, ohne Ablauf) ---- */
+var BE=null;try{BE=JSON.parse(localStorage.getItem(KEY+"-be")||"null");}catch(e){}
+function canSync(){return !!BE||(tok&&Date.now()<tokExp);}
+function beCall(o){o.key=BE.k;
+ return fetch(BE.u,{method:"POST",redirect:"follow",body:JSON.stringify(o)}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text();})
+ .then(function(t){var j;try{j=JSON.parse(t);}catch(e){throw new Error("Antwort unlesbar, Bereitstellung prüfen");}if(!j.ok)throw new Error(j.err||"Fehler");return j;});}
+function syncBE(){busy=true;st("Synchronisiere …");
+ beCall({action:"get"}).then(function(j){if(j.ev)showEv(j.ev);var rem=j.state;
+  if(rem){if((rem.v||1)>(S.v||1))throw new Error("VER");var bf=JSON.stringify(S);S=mergeState(S,rem);if(JSON.stringify(S)!==bf){save();render();}}
+  return beCall({action:"put",state:S,snap:snapLines()});})
+ .then(function(){st("Synchronisiert "+new Date().toLocaleTimeString("de-DE"));})
+ .catch(errSt).then(function(){busy=false;});}
+function errSt(e){if(e.message==="VER")st("Datei ist neuer als diese App, bitte App aktualisieren");else if(e.message==="HTTP 401"){tokExp=0;needLogin();}else if(e instanceof TypeError)st("Offline, Sync folgt");else st("Sync-Fehler: "+e.message);}
+var connOpen=false;
+function conBtn(){document.getElementById("conbtn").textContent=BE?"Server ✓":"Server";}
+function connPanel(){var c=document.getElementById("conn");c.replaceChildren();if(!connOpen)return;
+ var u=el("input",{type:"url",placeholder:"Web-App-Adresse (https://script.google.com/…/exec)",value:BE?BE.u:"","aria-label":"Web-App-Adresse"}),
+ k=el("input",{type:"password",placeholder:"Schlüssel",value:BE?BE.k:"","aria-label":"Schlüssel",autocomplete:"off"}),m=el("div",{class:"meta"});
+ function save2(){var uu=u.value.trim(),kk=k.value.trim();
+  if(uu.indexOf("https://script.google.com/")!==0||kk.length<16){m.textContent="Adresse muss mit https://script.google.com/ beginnen, der Schlüssel mindestens 16 Zeichen haben.";return;}
+  var old=BE;BE={u:uu,k:kk};m.textContent="Teste Verbindung …";
+  beCall({action:"get"}).then(function(){try{localStorage.setItem(KEY+"-be",JSON.stringify(BE));}catch(e){}connOpen=false;connPanel();conBtn();showReauth(false);msg="Server-Verbindung gespeichert.";syncNow();render();})
+  .catch(function(e){BE=old;m.textContent="Verbindung fehlgeschlagen: "+e.message;});}
+ c.appendChild(el("div",{class:"panel detail"},[el("div",{class:"meta"},["Verbindung zum eigenen Google-Skript. Damit entfällt die Neu-Anmeldung."]),u,k,
+  el("div",{class:"row"},[el("button",{class:"primary",type:"button",onclick:save2},["Speichern und testen"]),
+   BE?el("button",{type:"button",onclick:function(){BE=null;try{localStorage.removeItem(KEY+"-be");}catch(e){}connOpen=false;connPanel();conBtn();st("Server abgeschaltet");}},["Abschalten"]):null,
+   el("button",{type:"button",onclick:function(){connOpen=false;connPanel();}},["Schließen"])]),m]));}
+document.getElementById("conbtn").addEventListener("click",function(){connOpen=!connOpen;connPanel();});
 function snapLines(){var L=[],P=[],U=[],D=[];
  function walk(x,tr){tr=tr.concat(x.t);var c=x.kids.filter(function(k){return !isDone(k);})[0];if(c)walk(c,tr);else L.push(tr.join(" › "));}
  (function pr(list,tr){list.forEach(function(x){if(x.problem&&!isDone(x))P.push(tr.concat(x.t).join(" › "));pr(x.kids,tr.concat(x.t));});})(S.items,[]);
@@ -473,8 +523,9 @@ function snap(){var body=JSON.stringify(snapLines()),N="weg-snapshot.json";
   if(j.files.length)return gf(API+"upload/drive/v3/files/"+j.files[0].id+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body:body});
   var b="b"+uid(),m="--"+b+"\r\nContent-Type: application/json\r\n\r\n"+JSON.stringify({name:N})+"\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+body+"\r\n--"+b+"--";
   return gf(API+"upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:m});}).catch(function(){});}
-document.getElementById("syncbtn").addEventListener("click",function(){if(tok&&Date.now()<tokExp)syncNow();else login();});
-document.addEventListener("visibilitychange",function(){if(!document.hidden)syncNow();});
+document.getElementById("syncbtn").addEventListener("click",function(){if(canSync())syncNow();else login(false);});
+document.addEventListener("visibilitychange",function(){if(!document.hidden){keepAlive();syncNow();}});
+setInterval(function(){if(!document.hidden&&canSync())syncNow();},300000);
 document.getElementById("exp").addEventListener("click",function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:"application/json"}));a.download="weg-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();});
 var fi=document.getElementById("file");document.getElementById("imp").addEventListener("click",function(){fi.click();});
 fi.addEventListener("change",function(){var f=fi.files[0];if(!f)return;f.text().then(function(t){var j=JSON.parse(t);if(!j||!Array.isArray(j.items))throw 0;S=mergeState(S,j);msg="Backup zusammengeführt.";commit();}).catch(function(){msg="Die Datei ist kein gültiges Backup.";render();});fi.value="";});
@@ -483,6 +534,13 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").then(f
 var rl=false;if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",function(){if(rl)return;rl=true;location.reload();});
 sweep();save();
 setInterval(function(){var k=dayKey();if(k!==lastDay){dtick();render();}},60000);
+(function(){try{var h=location.hash.slice(1);if(h.indexOf("u=")<0)return;var q=new URLSearchParams(h),u=q.get("u"),k=q.get("k");
+ if(u&&k&&u.indexOf("https://script.google.com/")===0){BE={u:u,k:k};localStorage.setItem(KEY+"-be",JSON.stringify(BE));msg="Server-Verbindung gespeichert.";}
+ history.replaceState(null,"",location.pathname+location.search);}catch(e){}})();
+conBtn();
+frame(!BE);
+if(authed&&!BE){showReauth(true);st("Anmeldung abgelaufen, wird erneuert …");}
+setTimeout(function(){if(BE)syncNow();else keepAlive();},1500);
 render();
 })();
 </script>
