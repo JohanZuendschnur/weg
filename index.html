@@ -139,6 +139,9 @@ input[type=datetime-local],textarea{padding:7px 10px;border:1px solid var(--line
 @media (max-width:720px){.two{grid-template-columns:1fr}}
 .bubble small.late{color:var(--bad);font-weight:600}
 .daily .row input{flex:1;min-width:0;margin-top:0}
+.daily li label{display:flex;align-items:center;gap:6px;flex:1;min-width:0;cursor:pointer}
+.shop{font-size:.9rem}.shop li{padding:4px 0}.shop input[type=checkbox]{width:18px;height:18px}
+.shop ul{max-height:40vh;overflow:auto}
 .note{color:var(--mute);font-size:.8rem;margin-top:18px}
 @media (prefers-reduced-motion:reduce){.hero{transition:none}}
 </style>
@@ -146,7 +149,7 @@ input[type=datetime-local],textarea{padding:7px 10px;border:1px solid var(--line
 <body>
 <main>
 <div class="bar"><button id="syncbtn" class="primary">Sync</button><span id="sync" class="meta">Nicht verbunden</span><button id="exp">Export</button><button id="imp">Import</button><span id="upd"></span><input type="file" id="file" accept=".json,application/json" hidden></div>
-<div class="side"><aside class="today" aria-label="Termine heute"><h2>Heute</h2><div id="ev" class="meta">Mit Sync anmelden, um die Termine zu sehen.</div></aside><aside class="daily" id="daily" aria-label="Tägliche Todos"></aside></div>
+<div class="side"><aside class="today" aria-label="Termine heute"><h2>Heute</h2><div id="ev" class="meta">Mit Sync anmelden, um die Termine zu sehen.</div></aside><aside class="daily" id="daily" aria-label="Tägliche Todos"></aside><aside class="daily shop" id="shop" aria-label="Einkaufsliste"></aside></div>
 <p class="msg" id="msg" role="status" aria-live="polite"></p>
 <div id="app"></div>
 <p class="note">Daten liegen lokal im Browser und werden per Sync in deinem Google-Drive-App-Ordner abgeglichen. Backup über Export.</p>
@@ -222,6 +225,20 @@ function jobPanel(tid){var k=tid?"t":"g";
  box.appendChild(el("div",{class:"meta",style:"margin-top:8px"},["Jedes Stück kommt als eigene Zeile in die Druckliste ganz unten in der Übersicht."+(tid?" Offen aus diesem Todo: "+nPr(tid):"")]));
  return box;}
 function pn(x){return x.prio==null?1:x.prio;}
+function addShop(inp){var v=inp.value.split(",").map(function(x){return x.trim();}).filter(Boolean);if(!v.length)return;
+ inp.value="";S.shop=S.shop||[];v.forEach(function(t){S.shop.push({id:uid(),t:t,done:false,upd:Date.now()});});af="sl-new";commit();}
+function renderShop(){var box=document.getElementById("shop");if(!box)return;box.replaceChildren();
+ var L=(S.shop||[]).slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);}),nd=L.filter(function(x){return x.done;}).length;
+ box.appendChild(el("div",{class:"dh"},[el("strong",{},["Einkauf "+(L.length-nd)]),nd?el("button",{type:"button",onclick:function(){S.shop.filter(function(x){return x.done;}).forEach(function(x){tomb(x.id);});S.shop=S.shop.filter(function(x){return !x.done;});commit();}},["Erledigte entfernen ("+nd+")"]):null]));
+ var inp=el("input",{type:"text",placeholder:"Artikel, mehrere mit Komma","aria-label":"Neuer Artikel",maxlength:"120","data-k":"sl-new"});
+ inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addShop(inp);}});
+ box.appendChild(el("div",{class:"row",style:"flex-wrap:nowrap;margin-top:4px"},[inp,el("button",{type:"button",class:"primary",onclick:function(){addShop(inp);}},["+"])]));
+ if(L.length){var ul=el("ul");
+  L.forEach(function(x){var cb=el("input",{type:"checkbox"});cb.checked=!!x.done;
+   cb.addEventListener("change",function(){x.done=cb.checked;x.upd=Date.now();commit();});
+   ul.appendChild(el("li",{class:x.done?"dn":""},[el("label",{},[cb,el("span",{},[x.t])]),el("button",{type:"button",class:"x","aria-label":"Entfernen",onclick:function(){tomb(x.id);S.shop.splice(S.shop.indexOf(x),1);commit();}},["✕"])]));});
+  box.appendChild(ul);}}
+
 function fmtDue(v){var d=new Date(v);return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});}
 function dueRow(x){var i=el("input",{type:"datetime-local",value:x.due||"","aria-label":"Spätestens fertig bis","data-k":"du-"+x.id});
  i.addEventListener("change",function(){x.due=i.value||"";x.upd=Date.now();commit();});
@@ -401,7 +418,7 @@ function render(){
  document.getElementById("msg").textContent=msg;
  var fk=keep()||(af?{k:af}:null);af=null;var app=document.getElementById("app");app.replaceChildren();
  if(nav.length)path(app);else root(app);
- renderDaily();restore(fk);
+ renderDaily();renderShop();restore(fk);
 }
 var CLIENT_ID="922608704073-lv2jnan8fjohrlp29fknpf0k0gke7al7.apps.googleusercontent.com",tok=null,tokExp=0,tc=null,busy=false,timer=null,fid=null;
 try{fid=localStorage.getItem(KEY+"-fid");}catch(e){}
@@ -414,7 +431,7 @@ function mergeList(a,b,del){var m={},out=[];b.forEach(function(x){m[x.id]=x;});
  b.forEach(function(y){if(m[y.id])out.push(y);});
  return out.filter(function(x){return !(del[x.id]&&del[x.id]>(x.upd||0));});}
 function mergeState(a,b){var d=Object.assign({},a.deleted||{});var bd=b.deleted||{};for(var k in bd)d[k]=Math.max(d[k]||0,bd[k]);
- return Object.assign({},b,a,{v:Math.max(a.v||1,b.v||1),deleted:d,items:mergeList(a.items||[],b.items||[],d),prints:mergeList(a.prints||[],b.prints||[],d),daily:mergeList(a.daily||[],b.daily||[],d),dstreak:(((b.dstreak&&b.dstreak.upd)||0)>((a.dstreak&&a.dstreak.upd)||0))?b.dstreak:a.dstreak,log:(function(){var m={};(a.log||[]).concat(b.log||[]).forEach(function(l){m[l.id]=l;});return Object.keys(m).map(function(k){return m[k];});})()});}
+ return Object.assign({},b,a,{v:Math.max(a.v||1,b.v||1),deleted:d,items:mergeList(a.items||[],b.items||[],d),prints:mergeList(a.prints||[],b.prints||[],d),daily:mergeList(a.daily||[],b.daily||[],d),shop:mergeList(a.shop||[],b.shop||[],d),dstreak:(((b.dstreak&&b.dstreak.upd)||0)>((a.dstreak&&a.dstreak.upd)||0))?b.dstreak:a.dstreak,log:(function(){var m={};(a.log||[]).concat(b.log||[]).forEach(function(l){m[l.id]=l;});return Object.keys(m).map(function(k){return m[k];});})()});}
 function gf(url,o){o=o||{};o.headers=Object.assign({Authorization:"Bearer "+tok},o.headers||{});
  return fetch(url,o).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r;});}
 var API="https://www.googleapis.com/";
